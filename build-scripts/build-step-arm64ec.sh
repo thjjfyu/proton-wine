@@ -34,7 +34,10 @@ exec "$LLVM_MINGW_TOOLCHAIN/clang" --target=arm64ec-w64-mingw32 "\$@"
 EOF
 chmod +x "$ARM64EC_WRAPPER_DIR/arm64ec-w64-mingw32-clang"
 export PATH="$ARM64EC_WRAPPER_DIR:$PATH"
-export arm64ec_CC=arm64ec-w64-mingw32-clang
+export arm64ec_CC="$ARM64EC_WRAPPER_DIR/arm64ec-w64-mingw32-clang"
+export aarch64_CC="$LLVM_MINGW_TOOLCHAIN/aarch64-w64-mingw32-clang"
+export i386_CC="$LLVM_MINGW_TOOLCHAIN/i686-w64-mingw32-clang"
+export x86_64_CC="$LLVM_MINGW_TOOLCHAIN/x86_64-w64-mingw32-clang"
 
 export PKG_CONFIG_LIBDIR=$deps/lib/pkgconfig:$deps/share/pkgconfig
 export ACLOCAL_PATH=$deps/lib/aclocal:$deps/share/aclocal
@@ -84,6 +87,13 @@ do
 
   if [ "$arg" == "--configure" ];
   then
+    for cc in "$arm64ec_CC" "$aarch64_CC" "$i386_CC"; do
+      if [ ! -x "$cc" ]; then
+        echo "Error: cross-compiler not found or not executable: $cc"
+        exit 1
+      fi
+    done
+
     ./configure \
       --enable-archs=$WIN_ARCH \
       --host=$TARGET \
@@ -91,7 +101,6 @@ do
       --bindir $install_dir/bin \
       --libdir $install_dir/lib \
       --exec-prefix $install_dir \
-      --with-mingw=clang \
       --with-wine-tools=./wine-tools \
       --enable-win64 \
       --enable-nls \
