@@ -13,4 +13,5 @@ SOURCES = \
 	window.c \
 	wine.svg
 
-EXTRA_TARGETS = wine-debug.apk
+# Keep driver build enabled, but skip legacy Gradle APK target in CI.
+EXTRA_TARGETS =
