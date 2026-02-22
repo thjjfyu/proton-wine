@@ -1,7 +1,8 @@
 #!/bin/bash
+set -euo pipefail
 
 export ARCH="aarch64"
-export WIN_ARCH="arm64ec,aarch64,i386"
+export WIN_ARCH="aarch64,i386"
 export OUTPUT_DIR="$HOME/compiled-files-aarch64"
 
 export deps="$HOME/termuxfs/aarch64/data/data/com.termux/files/usr"
@@ -261,10 +262,20 @@ do
       exit 1
     fi
 
-    cp -r $install_dir/bin/wine* $OUTPUT_DIR/bin
-    cp -r $install_dir/bin/reg* $OUTPUT_DIR/bin
-    cp -r $install_dir/bin/msi* $OUTPUT_DIR/bin
-    cp -r $install_dir/bin/notepad $OUTPUT_DIR/bin
+    shopt -s nullglob
+    wine_bins=($install_dir/bin/wine*)
+    reg_bins=($install_dir/bin/reg*)
+    msi_bins=($install_dir/bin/msi*)
+
+    if [ ${#wine_bins[@]} -eq 0 ]; then
+      echo "Error: wine binaries not found in $install_dir/bin"
+      exit 1
+    fi
+
+    cp -r "${wine_bins[@]}" "$OUTPUT_DIR/bin"
+    if [ ${#reg_bins[@]} -gt 0 ]; then cp -r "${reg_bins[@]}" "$OUTPUT_DIR/bin"; fi
+    if [ ${#msi_bins[@]} -gt 0 ]; then cp -r "${msi_bins[@]}" "$OUTPUT_DIR/bin"; fi
+    if [ -e "$install_dir/bin/notepad" ]; then cp -r "$install_dir/bin/notepad" "$OUTPUT_DIR/bin"; fi
     cp -r $install_dir/lib/wine  $OUTPUT_DIR/lib
     cp -r $install_dir/share/wine  $OUTPUT_DIR/share
   fi
