@@ -33,6 +33,32 @@ cat > "$ARM64EC_WRAPPER_DIR/arm64ec-w64-mingw32-clang" <<EOF
 exec "$LLVM_MINGW_TOOLCHAIN/clang" --target=arm64ec-w64-mingw32 "\$@"
 EOF
 chmod +x "$ARM64EC_WRAPPER_DIR/arm64ec-w64-mingw32-clang"
+
+# Some Wine link paths still invoke *-gcc and can request libgcc.a which is
+# not present in this llvm-mingw setup. Provide gcc-compatible wrappers that
+# forward to clang and drop explicit -lgcc/-lgcc_eh requests.
+make_gcc_wrapper() {
+  local name="$1"
+  local target="$2"
+  cat > "$ARM64EC_WRAPPER_DIR/$name" <<EOF
+#!/usr/bin/env bash
+set -e
+args=()
+for a in "\$@"; do
+  case "\$a" in
+    -lgcc|-lgcc_eh) continue ;;
+    *) args+=("\$a") ;;
+  esac
+done
+exec "$LLVM_MINGW_TOOLCHAIN/clang" --target="$target" -rtlib=compiler-rt "\${args[@]}"
+EOF
+  chmod +x "$ARM64EC_WRAPPER_DIR/$name"
+}
+
+make_gcc_wrapper "i686-w64-mingw32-gcc" "i686-w64-mingw32"
+make_gcc_wrapper "x86_64-w64-mingw32-gcc" "x86_64-w64-mingw32"
+make_gcc_wrapper "aarch64-w64-mingw32-gcc" "aarch64-w64-mingw32"
+make_gcc_wrapper "arm64ec-w64-mingw32-gcc" "arm64ec-w64-mingw32"
 export PATH="$ARM64EC_WRAPPER_DIR:$PATH"
 export arm64ec_CC="$ARM64EC_WRAPPER_DIR/arm64ec-w64-mingw32-clang"
 export aarch64_CC="$LLVM_MINGW_TOOLCHAIN/aarch64-w64-mingw32-clang"
