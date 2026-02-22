@@ -89,7 +89,7 @@ do
       --without-coreaudio \
       --without-cups \
       --without-dbus \
-      --with-fontconfig \
+      --without-fontconfig \
       --with-freetype \
       --without-gettext \
       --with-gettextpo=no \
