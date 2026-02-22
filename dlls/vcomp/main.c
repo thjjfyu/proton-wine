@@ -289,7 +289,7 @@ static void CDECL _vcomp_fork_call_wrapper(void *wrapper, int nargs, void **args
 
 #endif
 
-#if defined(__GNUC__) && (defined(__i386__) || defined(__x86_64__))
+#if defined(__GNUC__) && (defined(__i386__) || defined(__x86_64__)) && !defined(__arm64ec__)
 
 static inline char interlocked_cmpxchg8(char *dest, char xchg, char compare)
 {

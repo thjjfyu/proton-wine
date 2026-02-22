@@ -4614,7 +4614,7 @@ static const struct wined3d_device_parent_ops d3d9_wined3d_device_parent_ops =
 
 static void setup_fpu(void)
 {
-#if defined(__GNUC__) && (defined(__i386__) || defined(__x86_64__))
+#if defined(__GNUC__) && (defined(__i386__) || defined(__x86_64__)) && !defined(__arm64ec__)
     WORD cw;
     __asm__ volatile ("fnstcw %0" : "=m" (cw));
     cw = (cw & ~0xf3f) | 0x3f;
