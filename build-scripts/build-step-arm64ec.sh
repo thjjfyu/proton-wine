@@ -82,6 +82,7 @@ do
       --with-mingw=clang \
       --with-wine-tools=./wine-tools \
       --enable-win64 \
+      --enable-wineandroid_drv=no \
       --disable-win16 \
       --disable-tests \
       --with-alsa \
