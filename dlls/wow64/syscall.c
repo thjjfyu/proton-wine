@@ -332,7 +332,7 @@ static void call_raise_user_exception_dispatcher( ULONG code )
 
 /* based on RtlRaiseException: call NtRaiseException with context setup to return to caller */
 void WINAPI raise_exception( EXCEPTION_RECORD *rec, CONTEXT *context, BOOL first_chance );
-#ifdef __x86_64__
+#if defined(__x86_64__) && !defined(__arm64ec__)
 __ASM_GLOBAL_FUNC( raise_exception,
                    "sub $0x28,%rsp\n\t"
                    __ASM_SEH(".seh_stackalloc 0x28\n\t")
@@ -347,7 +347,7 @@ __ASM_GLOBAL_FUNC( raise_exception,
                    "movq 0x28(%rsp),%rax\n\t"   /* return address */
                    "movq %rax,0xf8(%rdx)\n\t"   /* context->Rip */
                    "call " __ASM_NAME("NtRaiseException") )
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) || defined(__arm64ec__)
 __ASM_GLOBAL_FUNC( raise_exception,
                    "stp x29, x30, [sp, #-32]!\n\t"
                    __ASM_SEH(".seh_save_fplr_x 32\n\t")
@@ -1184,7 +1184,7 @@ void WINAPI Wow64LdrpInitialize( CONTEXT *context )
 /**********************************************************************
  *           Wow64PrepareForException  (wow64.@)
  */
-#ifdef __x86_64__
+#if defined(__x86_64__) && !defined(__arm64ec__)
 __ASM_GLOBAL_FUNC( Wow64PrepareForException,
                    "sub $0x38,%rsp\n\t"
                    "mov %rcx,%r10\n\t"           /* rec */

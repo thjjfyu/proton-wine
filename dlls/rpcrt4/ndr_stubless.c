@@ -916,7 +916,7 @@ LONG_PTR CDECL ndr_client_call( PMIDL_STUB_DESC pStubDesc, PFORMAT_STRING pForma
             const NDR_PROC_HEADER_EXTS *pExtensions = (const NDR_PROC_HEADER_EXTS *)pFormat;
             ext_flags = pExtensions->Flags2;
             pFormat += pExtensions->Size;
-#ifdef __x86_64__
+#if defined(__x86_64__) && !defined(__arm64ec__)
             if (pExtensions->Size > sizeof(*pExtensions) && fpu_stack)
             {
                 int i;
@@ -1002,7 +1002,7 @@ LONG_PTR CDECL ndr_client_call( PMIDL_STUB_DESC pStubDesc, PFORMAT_STRING pForma
     return RetVal;
 }
 
-#ifdef __x86_64__
+#if defined(__x86_64__) && !defined(__arm64ec__)
 
 __ASM_GLOBAL_FUNC( NdrClientCall2,
                    "subq $0x28,%rsp\n\t"
@@ -1912,7 +1912,7 @@ cleanup:
     return status;
 }
 
-#ifdef __x86_64__
+#if defined(__x86_64__) && !defined(__arm64ec__)
 
 __ASM_GLOBAL_FUNC( NdrAsyncClientCall,
                    "subq $0x28,%rsp\n\t"
@@ -2254,7 +2254,7 @@ LONG_PTR CDECL ndr64_client_call( MIDL_STUBLESS_PROXY_INFO *info,
     return 0;
 }
 
-#ifdef __x86_64__
+#if defined(__x86_64__) && !defined(__arm64ec__)
 
 __ASM_GLOBAL_FUNC( NdrClientCall3,
                    "subq $0x28,%rsp\n\t"
