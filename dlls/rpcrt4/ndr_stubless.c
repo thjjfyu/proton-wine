@@ -1096,7 +1096,7 @@ __ASM_GLOBAL_FUNC(call_server_func,
     __ASM_CFI(".cfi_def_cfa %esp,4\n\t")
     __ASM_CFI(".cfi_same_value %ebp\n\t")
     "ret" )
-#elif defined __x86_64__
+#elif defined(__x86_64__) && !defined(__arm64ec__)
 LONG_PTR __cdecl call_server_func(SERVER_ROUTINE func, unsigned char * args, unsigned int stack_size);
 __ASM_GLOBAL_FUNC( call_server_func,
                    "pushq %rbp\n\t"
@@ -1177,7 +1177,7 @@ __ASM_GLOBAL_FUNC( call_server_func,
                    "5:\tblx r4\n\t"
                    "mov SP, r5\n\t"
                    "pop {r4, r5, PC}" )
-#elif defined __aarch64__
+#elif defined(__aarch64__) || defined(__arm64ec__)
 LONG_PTR __cdecl call_server_func(SERVER_ROUTINE func, unsigned char *args, unsigned int stack_size);
 __ASM_GLOBAL_FUNC( call_server_func,
                    "stp x29, x30, [sp, #-16]!\n\t"
@@ -2316,7 +2316,7 @@ LONG_PTR CDECL ndr64_async_client_call( MIDL_STUBLESS_PROXY_INFO *info,
     return 0;
 }
 
-#ifdef __x86_64__
+#if defined(__x86_64__) && !defined(__arm64ec__)
 
 __ASM_GLOBAL_FUNC( Ndr64AsyncClientCall,
                    "subq $0x28,%rsp\n\t"
