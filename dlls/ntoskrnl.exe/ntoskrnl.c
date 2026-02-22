@@ -4185,7 +4185,7 @@ NTSTATUS WINAPI IoCreateFile(HANDLE *handle, ACCESS_MASK access, OBJECT_ATTRIBUT
 /**************************************************************************
  *		__chkstk (NTOSKRNL.@)
  */
-#ifdef __x86_64__
+#if defined(__x86_64__) && !defined(__arm64ec__)
 /* Supposed to touch all the stack pages, but we shouldn't need that. */
 __ASM_GLOBAL_FUNC( __chkstk, "ret" );
 #elif defined(__i386__)
@@ -4200,7 +4200,7 @@ __ASM_GLOBAL_FUNC( _chkstk,
 /* Incoming r4 contains words to allocate, converting to bytes then return */
 __ASM_GLOBAL_FUNC( __chkstk, "lsl r4, r4, #2\n\t"
                              "bx lr" )
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) || defined(__arm64ec__)
 /* Supposed to touch all the stack pages, but we shouldn't need that. */
 __ASM_GLOBAL_FUNC( __chkstk, "ret" );
 #endif

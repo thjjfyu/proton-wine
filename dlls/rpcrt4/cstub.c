@@ -135,7 +135,7 @@ static ULONG WINAPI delegating_Release(IUnknown *pUnk)
     ".byte 0xff,0xa0\n\t" /* jmp *offset(%eax) */ \
     ".long 4*("#num")\n\t"
 
-#elif defined(__x86_64__)
+#elif defined(__x86_64__) && !defined(__arm64ec__)
 
 #define THUNK_ENTRY_SIZE 16
 #define THUNK_ENTRY(num) \
@@ -154,7 +154,7 @@ static ULONG WINAPI delegating_Release(IUnknown *pUnk)
     "ldr ip, [r0]\n\t" \
     "ldr pc, [ip, #(4*("#num"))]\n\t"
 
-#elif defined(__aarch64__)
+#elif defined(__aarch64__) || defined(__arm64ec__)
 
 #define THUNK_ENTRY_SIZE 20
 #define THUNK_ENTRY(num) \
