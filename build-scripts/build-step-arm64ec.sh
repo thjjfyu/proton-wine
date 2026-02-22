@@ -24,6 +24,18 @@ export RANLIB=$TOOLCHAIN/llvm-ranlib
 export STRIP=$TOOLCHAIN/llvm-strip
 export DLLTOOL=$LLVM_MINGW_TOOLCHAIN/llvm-dlltool
 
+# Force a dedicated ARM64EC cross-compiler name so Wine configure
+# does not fall back to plain "clang" with unsupported "arm64ec-windows".
+export ARM64EC_WRAPPER_DIR="$HOME/toolchains/arm64ec-wrapper/bin"
+mkdir -p "$ARM64EC_WRAPPER_DIR"
+cat > "$ARM64EC_WRAPPER_DIR/arm64ec-w64-mingw32-clang" <<EOF
+#!/bin/sh
+exec "$LLVM_MINGW_TOOLCHAIN/clang" --target=arm64ec-w64-mingw32 "\$@"
+EOF
+chmod +x "$ARM64EC_WRAPPER_DIR/arm64ec-w64-mingw32-clang"
+export PATH="$ARM64EC_WRAPPER_DIR:$PATH"
+export arm64ec_CC=arm64ec-w64-mingw32-clang
+
 export PKG_CONFIG_LIBDIR=$deps/lib/pkgconfig:$deps/share/pkgconfig
 export ACLOCAL_PATH=$deps/lib/aclocal:$deps/share/aclocal
 export CPPFLAGS="-I$deps/include --sysroot=$TOOLCHAIN/../sysroot"
