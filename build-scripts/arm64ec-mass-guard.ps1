@@ -33,22 +33,38 @@ function Convert-Content {
     $tmp = [regex]::Replace($newText, $pattern3, $replace3)
     if ($tmp -ne $newText) { $newText = $tmp; $changed = $true }
 
-    # 4) #elif defined(__aarch64__) ... (without arm64ec) -> include arm64ec
-    $pattern4 = '(?m)^([ \t]*)#elif[ \t]+defined\(__aarch64__\)(?![^\r\n]*arm64ec)([^\r\n]*)$'
-    $replace4 = '$1#elif defined(__aarch64__) || defined(__arm64ec__)$2'
+    # 4) Handle short GNU style: defined __x86_64__
+    $pattern4 = '(?m)^([ \t]*)#if[ \t]+defined[ \t]+__x86_64__(?![^\r\n]*arm64ec)([^\r\n]*)$'
+    $replace4 = '$1#if defined(__x86_64__) && !defined(__arm64ec__)$2'
     $tmp = [regex]::Replace($newText, $pattern4, $replace4)
     if ($tmp -ne $newText) { $newText = $tmp; $changed = $true }
 
-    # 5) (defined(__i386__) || defined(__x86_64__)) -> add !arm64ec if missing
-    $pattern5 = '\([ \t]*defined\(__i386__\)[ \t]*\|\|[ \t]*defined\(__x86_64__\)[ \t]*\)(?![^\r\n]*__arm64ec__)'
-    $replace5 = '(defined(__i386__) || defined(__x86_64__)) && !defined(__arm64ec__)'
+    $pattern5 = '(?m)^([ \t]*)#elif[ \t]+defined[ \t]+__x86_64__(?![^\r\n]*arm64ec)([^\r\n]*)$'
+    $replace5 = '$1#elif defined(__x86_64__) && !defined(__arm64ec__)$2'
     $tmp = [regex]::Replace($newText, $pattern5, $replace5)
     if ($tmp -ne $newText) { $newText = $tmp; $changed = $true }
 
-    # 6) (defined(__x86_64__) || defined(__i386__)) -> add !arm64ec if missing
-    $pattern6 = '\([ \t]*defined\(__x86_64__\)[ \t]*\|\|[ \t]*defined\(__i386__\)[ \t]*\)(?![^\r\n]*__arm64ec__)'
-    $replace6 = '(defined(__x86_64__) || defined(__i386__)) && !defined(__arm64ec__)'
+    # 5) #elif defined(__aarch64__) ... (without arm64ec) -> include arm64ec
+    $pattern6 = '(?m)^([ \t]*)#elif[ \t]+defined\(__aarch64__\)(?![^\r\n]*arm64ec)([^\r\n]*)$'
+    $replace6 = '$1#elif defined(__aarch64__) || defined(__arm64ec__)$2'
     $tmp = [regex]::Replace($newText, $pattern6, $replace6)
+    if ($tmp -ne $newText) { $newText = $tmp; $changed = $true }
+
+    $pattern7 = '(?m)^([ \t]*)#elif[ \t]+defined[ \t]+__aarch64__(?![^\r\n]*arm64ec)([^\r\n]*)$'
+    $replace7 = '$1#elif defined(__aarch64__) || defined(__arm64ec__)$2'
+    $tmp = [regex]::Replace($newText, $pattern7, $replace7)
+    if ($tmp -ne $newText) { $newText = $tmp; $changed = $true }
+
+    # 6) (defined(__i386__) || defined(__x86_64__)) -> add !arm64ec if missing
+    $pattern8 = '\([ \t]*defined\(__i386__\)[ \t]*\|\|[ \t]*defined\(__x86_64__\)[ \t]*\)(?![^\r\n]*__arm64ec__)'
+    $replace8 = '(defined(__i386__) || defined(__x86_64__)) && !defined(__arm64ec__)'
+    $tmp = [regex]::Replace($newText, $pattern8, $replace8)
+    if ($tmp -ne $newText) { $newText = $tmp; $changed = $true }
+
+    # 7) (defined(__x86_64__) || defined(__i386__)) -> add !arm64ec if missing
+    $pattern9 = '\([ \t]*defined\(__x86_64__\)[ \t]*\|\|[ \t]*defined\(__i386__\)[ \t]*\)(?![^\r\n]*__arm64ec__)'
+    $replace9 = '(defined(__x86_64__) || defined(__i386__)) && !defined(__arm64ec__)'
+    $tmp = [regex]::Replace($newText, $pattern9, $replace9)
     if ($tmp -ne $newText) { $newText = $tmp; $changed = $true }
 
     return @{ Changed = $changed; Text = $newText }
