@@ -2,9 +2,9 @@ name: Build Proton Wine
 
 on:
   push:
-    branches: [ main, master, proton_10.0 ]
+    branches: [ main, master, proton_10.0, wine_9.2-arm ]
   pull_request:
-    branches: [ main, master, proton_10.0 ]
+    branches: [ main, master, proton_10.0, wine_9.2-arm ]
   workflow_dispatch:
 
 jobs:
@@ -163,9 +163,9 @@ jobs:
           cat > $GITHUB_WORKSPACE/profile.json << EOF
           {
             "type": "Proton",
-            "versionName": "10.0-4-${ARCH_NAME}",
+            "versionName": "9.2-1-${ARCH_NAME}",
             "versionCode": ${{ github.run_number }},
-            "description": "Proton 10.0-4 ${ARCH_NAME} - Windows compatibility layer with improved gaming support",
+            "description": "Wine 9.2-1 ${ARCH_NAME} - Android/Winlator build",
             "files": [],
             "wine": {
               "binPath": "bin",
@@ -190,8 +190,8 @@ jobs:
           # Create WCP (Winlator Compatible Package) - txz format
           cp $GITHUB_WORKSPACE/prefixPack.tzst .
           cp $GITHUB_WORKSPACE/profile.json .
-          tar cJf proton-10.0-$ARCH_NAME.wcp bin lib share prefixPack.tzst profile.json
-          mv proton-10.0-$ARCH_NAME.wcp $GITHUB_WORKSPACE/
+          tar cJf proton-9.2-$ARCH_NAME.wcp bin lib share prefixPack.tzst profile.json
+          mv proton-9.2-$ARCH_NAME.wcp $GITHUB_WORKSPACE/
       
       - name: Upload build artifacts
         run: |
@@ -206,13 +206,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: proton-wine-${{ env.ARCH_NAME }}
-          path: proton-10.0-${{ env.ARCH_NAME }}.wcp
+          path: proton-9.2-${{ env.ARCH_NAME }}.wcp
           retention-days: 30
   
   release:
     needs: build
     runs-on: ubuntu-24.04
-    if: (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/proton_10.0')) || github.event_name == 'workflow_dispatch'
+    if: (github.event_name == 'push' && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master' || github.ref == 'refs/heads/proton_10.0' || github.ref == 'refs/heads/wine_9.2-arm')) || github.event_name == 'workflow_dispatch'
     
     steps:
       - name: Download all artifacts
@@ -230,14 +230,14 @@ jobs:
         uses: softprops/action-gh-release@v1
         with:
           tag_name: release-${{ github.sha }}
-          name: Proton Wine 10.0-4 (Build ${{ github.run_number }})
+          name: Proton Wine 9.2-1 (Build ${{ github.run_number }})
           files: release/*
           draft: false
           prerelease: false
           body: |
-            ## Proton Wine Build based on Valve [Wine](https://github.com/ValveSoftware/wine/tree/proton_10.0)
+            ## Proton Wine Build based on [Wine 9.2](https://github.com/wine-mirror/wine/releases/tag/wine-9.2)
             
-            ### Proton Version: 10.0-4
+            ### Proton Version: 9.2-1
             
             Built from commit: ${{ github.sha }}
             
@@ -246,7 +246,7 @@ jobs:
             - arm64ec (ARM64EC)
             
             ### WCP Files
-            - `proton-10.0-x86_64.wcp` - For GameNative & Winlator fork (txz format)
-            - `proton-10.0-arm64ec.wcp` - For GameNative & Winlator fork (txz format)
+            - `proton-9.2-x86_64.wcp` - For GameNative & Winlator fork (txz format)
+            - `proton-9.2-arm64ec.wcp` - For GameNative & Winlator fork (txz format)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

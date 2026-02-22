@@ -50,8 +50,8 @@ The build follows these steps for each architecture:
 ## Triggers
 
 The workflow runs on:
-- **Push** to `main` or `master` branch
-- **Pull requests** to `main` or `master` branch
+- **Push** to `main`, `master`, `proton_10.0`, or `wine_9.2-arm` branch
+- **Pull requests** to `main`, `master`, `proton_10.0`, or `wine_9.2-arm` branch
 - **Manual trigger** via workflow_dispatch
 
 ## Caching Strategy
@@ -70,8 +70,8 @@ Build artifacts are:
 ### Artifact Names
 
 **WCP Files (Winlator Compatible Package)**
-- `proton-10.0-x86_64.wcp` - x86_64 WCP (xz compressed, txz format)
-- `proton-10.0-aarch64.wcp` - aarch64 WCP (xz compressed, txz format)
+- `proton-9.2-x86_64.wcp` - x86_64 WCP (xz compressed, txz format)
+- `proton-9.2-arm64ec.wcp` - arm64ec WCP (xz compressed, txz format)
 
 ## Build Scripts Used
 
@@ -84,7 +84,7 @@ The workflow utilizes the following scripts from `build-scripts/`:
 
 ### External Dependencies
 - **Termuxfs**: Pre-built termux filesystem from GameNative/termux-on-gha
-- **Android NDK**: r27c from Google
+- **Android NDK**: r27d from Google
 - **LLVM MinGW**: 20250920 release from mstorsjo/llvm-mingw
 
 ### Build Dependencies

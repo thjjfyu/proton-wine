@@ -82,19 +82,14 @@ do
       --with-wine-tools=./wine-tools \
       --enable-win64 \
       --disable-win16 \
-      --enable-nls \
-      --disable-amd_ags_x64 \
-      --enable-wineandroid_drv=no \
       --disable-tests \
       --with-alsa \
       --without-capi \
       --without-coreaudio \
       --without-cups \
       --without-dbus \
-      --without-ffmpeg \
       --with-fontconfig \
       --with-freetype \
-      --without-gcrypt \
       --without-gettext \
       --with-gettextpo=no \
       --without-gphoto \
@@ -110,7 +105,6 @@ do
       --without-oss \
       --without-pcap \
       --without-pcsclite \
-      --without-piper \
       --with-pthread \
       --with-pulse \
       --without-sane \
@@ -119,7 +113,6 @@ do
       --without-unwind \
       --without-usb \
       --without-v4l2 \
-      --without-vosk \
       --with-vulkan \
       --without-wayland \
       --without-xcomposite \
@@ -195,9 +188,13 @@ do
     )
 
     for patch in "${PATCHES[@]}"; do
-#      if git apply --check ./android/patches/$patch 2>/dev/null; then
-        git apply ./android/patches/$patch
-#      fi
+      patch_file="./android/patches/$patch"
+      if git apply --check "$patch_file" 2>/dev/null; then
+        echo "Applying $patch"
+        git apply "$patch_file"
+      else
+        echo "Skipping incompatible patch: $patch"
+      fi
     done
   fi
 
