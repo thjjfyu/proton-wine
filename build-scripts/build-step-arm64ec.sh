@@ -242,7 +242,25 @@ do
     mkdir -p $OUTPUT_DIR/lib
     mkdir -p $OUTPUT_DIR/share
     mkdir -p $install_dir
-    make install -j$(nproc)
+
+    if make -n install >/dev/null 2>&1; then
+      make install -j$(nproc)
+    elif make -n install-lib >/dev/null 2>&1; then
+      echo "Target 'install' not found, using 'install-lib'"
+      make install-lib -j$(nproc)
+      if make -n install-dev >/dev/null 2>&1; then
+        make install-dev -j$(nproc)
+      fi
+    else
+      echo "Error: no install target found in Makefile"
+      exit 1
+    fi
+
+    if [ ! -d "$install_dir/bin" ] || [ ! -d "$install_dir/lib/wine" ] || [ ! -d "$install_dir/share/wine" ]; then
+      echo "Error: install output is incomplete in $install_dir"
+      exit 1
+    fi
+
     cp -r $install_dir/bin/wine* $OUTPUT_DIR/bin
     cp -r $install_dir/bin/reg* $OUTPUT_DIR/bin
     cp -r $install_dir/bin/msi* $OUTPUT_DIR/bin
