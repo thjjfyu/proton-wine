@@ -146,11 +146,11 @@ do
       # sdl patch
       "dlls_winebus_sys_bus_sdl_c.patch"
 
-      # shm_utils
-      "dlls_ntdll_unix_esync_c.patch"
-      "dlls_ntdll_unix_fsync_c.patch"
-      "server_esync_c.patch"
-      "server_fsync_c.patch"
+      # shm_utils (disabled for Wine 11 x86 branch due unstable build regressions)
+      # "dlls_ntdll_unix_esync_c.patch"
+      # "dlls_ntdll_unix_fsync_c.patch"
+      # "server_esync_c.patch"
+      # "server_fsync_c.patch"
 
       # winex11
       "dlls_winex11_drv_x11drv_h.patch"
