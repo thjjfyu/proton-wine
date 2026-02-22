@@ -1,4 +1,5 @@
 #!/bin/bash
+set -euo pipefail
 
 export ARCH="x86_64"
 export WIN_ARCH="x86_64,i386"
@@ -127,6 +128,11 @@ do
       --without-xshm \
       --without-xxf86vm
 
+    if [ ! -f "./Makefile" ]; then
+      echo "Error: configure finished but Makefile was not generated"
+      exit 1
+    fi
+
     echo "Applying patches..."
 
     PATCHES=(
@@ -201,6 +207,10 @@ do
   if [ "$arg" == "--build" ]
   then
     echo "Building..."
+    if [ ! -f "./Makefile" ]; then
+      echo "Error: Makefile not found. Configure step likely failed."
+      exit 1
+    fi
     rm -rf $OUTPUT_DIR/bin
     rm -rf $OUTPUT_DIR/lib
     rm -rf $OUTPUT_DIR/share
@@ -215,11 +225,39 @@ do
     mkdir -p $OUTPUT_DIR/lib
     mkdir -p $OUTPUT_DIR/share
     mkdir -p $install_dir
-    make install -j$(nproc)
-    cp -r $install_dir/bin/wine* $OUTPUT_DIR/bin
-    cp -r $install_dir/bin/reg* $OUTPUT_DIR/bin
-    cp -r $install_dir/bin/msi* $OUTPUT_DIR/bin
-    cp -r $install_dir/bin/notepad $OUTPUT_DIR/bin
+
+    if make -n install >/dev/null 2>&1; then
+      make install -j$(nproc)
+    elif make -n install-lib >/dev/null 2>&1; then
+      echo "Target 'install' not found, using 'install-lib'"
+      make install-lib -j$(nproc)
+      if make -n install-dev >/dev/null 2>&1; then
+        make install-dev -j$(nproc)
+      fi
+    else
+      echo "Error: no install target found in Makefile"
+      exit 1
+    fi
+
+    if [ ! -d "$install_dir/bin" ] || [ ! -d "$install_dir/lib/wine" ] || [ ! -d "$install_dir/share/wine" ]; then
+      echo "Error: install output is incomplete in $install_dir"
+      exit 1
+    fi
+
+    shopt -s nullglob
+    wine_bins=($install_dir/bin/wine*)
+    reg_bins=($install_dir/bin/reg*)
+    msi_bins=($install_dir/bin/msi*)
+
+    if [ ${#wine_bins[@]} -eq 0 ]; then
+      echo "Error: wine binaries not found in $install_dir/bin"
+      exit 1
+    fi
+
+    cp -r "${wine_bins[@]}" "$OUTPUT_DIR/bin"
+    if [ ${#reg_bins[@]} -gt 0 ]; then cp -r "${reg_bins[@]}" "$OUTPUT_DIR/bin"; fi
+    if [ ${#msi_bins[@]} -gt 0 ]; then cp -r "${msi_bins[@]}" "$OUTPUT_DIR/bin"; fi
+    if [ -e "$install_dir/bin/notepad" ]; then cp -r "$install_dir/bin/notepad" "$OUTPUT_DIR/bin"; fi
     cp -r $install_dir/lib/wine  $OUTPUT_DIR/lib
     cp -r $install_dir/share/wine  $OUTPUT_DIR/share
   fi
