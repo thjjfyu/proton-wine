@@ -2059,7 +2059,7 @@ static int pre_exec(void)
     return 1;  /* we have a preloader on x86-64/arm64 */
 }
 
-#elif defined(__APPLE__) && (defined(__i386__) || defined(__x86_64__))
+#elif defined(__APPLE__) && (defined(__i386__) || defined(__x86_64__)) && !defined(__arm64ec__)
 
 static int pre_exec(void)
 {

@@ -1247,7 +1247,7 @@ int CDECL _controlfp_s(unsigned int *cur, unsigned int newval, unsigned int mask
     return 0;
 }
 
-#if _MSVCR_VER >= 140 && (defined(__i386__) || defined(__x86_64__))
+#if _MSVCR_VER >= 140 && (defined(__i386__) || defined(__x86_64__)) && !defined(__arm64ec__)
 enum fenv_masks
 {
     FENV_X_INVALID = 0x00100010,
