@@ -6998,21 +6998,21 @@ static FORCEINLINE void MemoryBarrier(void)
 #define __WINE_STORE32_NO_FENCE(dest, value) ((void)(*(dest) = (value)))
 #endif  /* _MSC_VER >= 1700 */
 
-#if defined(__i386__) || defined(__x86_64__)
+#if (defined(__i386__) || defined(__x86_64__)) && !defined(__arm64ec__)
 #pragma intrinsic(_ReadWriteBarrier)
 void _ReadWriteBarrier(void);
-#endif  /* defined(__i386__) || defined(__x86_64__) */
+#endif  /* (defined(__i386__) || defined(__x86_64__)) && !defined(__arm64ec__) */
 
 static void __wine_memory_barrier_acq_rel(void)
 {
-#if defined(__i386__) || defined(__x86_64__)
+#if (defined(__i386__) || defined(__x86_64__)) && !defined(__arm64ec__)
 #pragma warning(suppress:4996)
     _ReadWriteBarrier();
 #elif defined(__arm__)
     __dmb(_ARM_BARRIER_ISH);
 #elif defined(__aarch64__)
     __dmb(_ARM64_BARRIER_ISH);
-#endif  /* defined(__i386__) || defined(__x86_64__) */
+#endif  /* (defined(__i386__) || defined(__x86_64__)) && !defined(__arm64ec__) */
 }
 
 static FORCEINLINE LONG ReadAcquire( LONG const volatile *src )
@@ -7091,9 +7091,9 @@ static FORCEINLINE LONGLONG WINAPI InterlockedCompareExchange64( LONGLONG volati
 static FORCEINLINE LONG WINAPI InterlockedExchange( LONG volatile *dest, LONG val )
 {
     LONG ret;
-#if (__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ >= 7))
+#if defined(__clang__) || (__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ >= 7))
     ret = __atomic_exchange_n( dest, val, __ATOMIC_SEQ_CST );
-#elif defined(__i386__) || defined(__x86_64__)
+#elif (defined(__i386__) || defined(__x86_64__)) && !defined(__arm64ec__)
     __asm__ __volatile__( "lock; xchgl %0,(%1)"
                           : "=r" (ret) :"r" (dest), "0" (val) : "memory" );
 #else
@@ -7150,9 +7150,9 @@ static FORCEINLINE LONGLONG WINAPI InterlockedDecrement64( LONGLONG volatile *de
 static FORCEINLINE void * WINAPI InterlockedExchangePointer( void *volatile *dest, void *val )
 {
     void *ret;
-#if (__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ >= 7))
+#if defined(__clang__) || (__GNUC__ > 4) || ((__GNUC__ == 4) && (__GNUC_MINOR__ >= 7))
     ret = __atomic_exchange_n( dest, val, __ATOMIC_SEQ_CST );
-#elif defined(__x86_64__)
+#elif defined(__x86_64__) && !defined(__arm64ec__)
     __asm__ __volatile__( "lock; xchgq %0,(%1)" : "=r" (ret) :"r" (dest), "0" (val) : "memory" );
 #elif defined(__i386__)
     __asm__ __volatile__( "lock; xchgl %0,(%1)" : "=r" (ret) :"r" (dest), "0" (val) : "memory" );
@@ -7187,7 +7187,7 @@ static FORCEINLINE void MemoryBarrier(void)
     __sync_synchronize();
 }
 
-#if defined(__x86_64__) || defined(__i386__)
+#if (defined(__x86_64__) || defined(__i386__)) && !defined(__arm64ec__)
 /* On x86, Support old GCC with either no or buggy (GCC BZ#81316) __atomic_* support */
 #define __WINE_ATOMIC_LOAD_ACQUIRE(ptr, ret) do { *(ret) = *(ptr); __asm__ __volatile__( "" ::: "memory" ); } while (0)
 #define __WINE_ATOMIC_LOAD_RELAXED(ptr, ret) do { *(ret) = *(ptr); } while (0)
@@ -7198,7 +7198,7 @@ static FORCEINLINE void MemoryBarrier(void)
 #define __WINE_ATOMIC_LOAD_RELAXED(ptr, ret) __atomic_load(ptr, ret, __ATOMIC_RELAXED)
 #define __WINE_ATOMIC_STORE_RELEASE(ptr, val) __atomic_store(ptr, val, __ATOMIC_RELEASE)
 #define __WINE_ATOMIC_STORE_RELAXED(ptr, val) __atomic_store(ptr, val, __ATOMIC_RELAXED)
-#endif  /* defined(__x86_64__) || defined(__i386__) */
+#endif  /* (defined(__x86_64__) || defined(__i386__)) && !defined(__arm64ec__) */
 
 static FORCEINLINE LONG ReadAcquire( LONG const volatile *src )
 {
@@ -7226,7 +7226,7 @@ static FORCEINLINE void WriteNoFence( LONG volatile *dest, LONG value )
 
 static FORCEINLINE DECLSPEC_NORETURN void __fastfail(unsigned int code)
 {
-#if defined(__x86_64__) || defined(__i386__)
+#if (defined(__x86_64__) || defined(__i386__)) && !defined(__arm64ec__)
     for (;;) __asm__ __volatile__( "int $0x29" :: "c" ((ULONG_PTR)code) : "memory" );
 #elif defined(__aarch64__)
     register ULONG_PTR val __asm__("x0") = code;
@@ -7282,7 +7282,7 @@ static FORCEINLINE unsigned char InterlockedCompareExchange128( volatile __int64
 static FORCEINLINE void YieldProcessor(void)
 {
 #ifdef __GNUC__
-#if defined(__i386__) || defined(__x86_64__)
+#if (defined(__i386__) || defined(__x86_64__)) && !defined(__arm64ec__)
     __asm__ __volatile__( "rep; nop" : : : "memory" );
 #elif defined(__arm__) || defined(__aarch64__)
     __asm__ __volatile__( "dmb ishst\n\tyield" : : : "memory" );
