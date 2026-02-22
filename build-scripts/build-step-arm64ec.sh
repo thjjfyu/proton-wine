@@ -2,7 +2,7 @@
 set -euo pipefail
 
 export ARCH="aarch64"
-export WIN_ARCH="aarch64,i386"
+export WIN_ARCH="arm64ec,aarch64,i386"
 export OUTPUT_DIR="$HOME/compiled-files-aarch64"
 
 export deps="$HOME/termuxfs/aarch64/data/data/com.termux/files/usr"
@@ -82,6 +82,8 @@ do
       --with-mingw=clang \
       --with-wine-tools=./wine-tools \
       --enable-win64 \
+      --enable-nls \
+      --disable-amd_ags_x64 \
       --enable-wineandroid_drv=no \
       --disable-win16 \
       --disable-tests \
@@ -90,8 +92,10 @@ do
       --without-coreaudio \
       --without-cups \
       --without-dbus \
+      --without-ffmpeg \
       --with-fontconfig \
       --with-freetype \
+      --without-gcrypt \
       --without-gettext \
       --with-gettextpo=no \
       --without-gphoto \
@@ -107,6 +111,7 @@ do
       --without-oss \
       --without-pcap \
       --without-pcsclite \
+      --without-piper \
       --with-pthread \
       --with-pulse \
       --without-sane \
@@ -115,6 +120,7 @@ do
       --without-unwind \
       --without-usb \
       --without-v4l2 \
+      --without-vosk \
       --with-vulkan \
       --without-wayland \
       --without-xcomposite \
@@ -260,6 +266,10 @@ do
 
     if [ ! -d "$install_dir/bin" ] || [ ! -d "$install_dir/lib/wine" ] || [ ! -d "$install_dir/share/wine" ]; then
       echo "Error: install output is incomplete in $install_dir"
+      exit 1
+    fi
+    if [ ! -f "$install_dir/lib/wine/arm64ec-windows/ntdll.dll" ]; then
+      echo "Error: arm64ec ntdll.dll is missing in $install_dir/lib/wine/arm64ec-windows"
       exit 1
     fi
 
