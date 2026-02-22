@@ -67,6 +67,17 @@ function Convert-Content {
     $tmp = [regex]::Replace($newText, $pattern9, $replace9)
     if ($tmp -ne $newText) { $newText = $tmp; $changed = $true }
 
+    # 8) Non-parenthesized i386/x86_64 checks
+    $pattern10 = '(?m)^([ \t]*#(?:if|elif)[ \t]+)defined\(__i386__\)[ \t]*\|\|[ \t]*defined\(__x86_64__\)(?![^\r\n]*__arm64ec__)([^\r\n]*)$'
+    $replace10 = '$1(defined(__i386__) || defined(__x86_64__)) && !defined(__arm64ec__)$2'
+    $tmp = [regex]::Replace($newText, $pattern10, $replace10)
+    if ($tmp -ne $newText) { $newText = $tmp; $changed = $true }
+
+    $pattern11 = '(?m)^([ \t]*#(?:if|elif)[ \t]+)defined\(__x86_64__\)[ \t]*\|\|[ \t]*defined\(__i386__\)(?![^\r\n]*__arm64ec__)([^\r\n]*)$'
+    $replace11 = '$1(defined(__x86_64__) || defined(__i386__)) && !defined(__arm64ec__)$2'
+    $tmp = [regex]::Replace($newText, $pattern11, $replace11)
+    if ($tmp -ne $newText) { $newText = $tmp; $changed = $true }
+
     return @{ Changed = $changed; Text = $newText }
 }
 
