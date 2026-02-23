@@ -59,6 +59,59 @@ make_gcc_wrapper "i686-w64-mingw32-gcc" "i686-w64-mingw32"
 make_gcc_wrapper "x86_64-w64-mingw32-gcc" "x86_64-w64-mingw32"
 make_gcc_wrapper "aarch64-w64-mingw32-gcc" "aarch64-w64-mingw32"
 make_gcc_wrapper "arm64ec-w64-mingw32-gcc" "arm64ec-w64-mingw32"
+
+# Some host-side unix objects are compiled with clang -m64 and can inherit
+# PE-only flags (e.g. -mabi=ms). Filter those flags only for non-targeted
+# host invocations while preserving --target=* cross-compiles.
+HOST_CLANG_REAL="$(command -v clang || true)"
+HOST_CLANGXX_REAL="$(command -v clang++ || true)"
+
+if [ -n "$HOST_CLANG_REAL" ]; then
+  cat > "$ARM64EC_WRAPPER_DIR/clang" <<EOF
+#!/usr/bin/env bash
+set -e
+target_arg=""
+for a in "\$@"; do
+  case "\$a" in
+    --target=*) target_arg="\${a#--target=}" ;;
+  esac
+done
+if [ -z "\$target_arg" ]; then
+  args=()
+  for a in "\$@"; do
+    [ "\$a" = "-mabi=ms" ] && continue
+    args+=("\$a")
+  done
+  exec "$HOST_CLANG_REAL" "\${args[@]}"
+fi
+exec "$HOST_CLANG_REAL" "\$@"
+EOF
+  chmod +x "$ARM64EC_WRAPPER_DIR/clang"
+fi
+
+if [ -n "$HOST_CLANGXX_REAL" ]; then
+  cat > "$ARM64EC_WRAPPER_DIR/clang++" <<EOF
+#!/usr/bin/env bash
+set -e
+target_arg=""
+for a in "\$@"; do
+  case "\$a" in
+    --target=*) target_arg="\${a#--target=}" ;;
+  esac
+done
+if [ -z "\$target_arg" ]; then
+  args=()
+  for a in "\$@"; do
+    [ "\$a" = "-mabi=ms" ] && continue
+    args+=("\$a")
+  done
+  exec "$HOST_CLANGXX_REAL" "\${args[@]}"
+fi
+exec "$HOST_CLANGXX_REAL" "\$@"
+EOF
+  chmod +x "$ARM64EC_WRAPPER_DIR/clang++"
+fi
+
 export PATH="$ARM64EC_WRAPPER_DIR:$PATH"
 export arm64ec_CC="$ARM64EC_WRAPPER_DIR/arm64ec-w64-mingw32-clang"
 export aarch64_CC="$LLVM_MINGW_TOOLCHAIN/aarch64-w64-mingw32-clang"
