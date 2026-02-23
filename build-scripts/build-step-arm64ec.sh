@@ -3,30 +3,57 @@ set -euo pipefail
 
 export ARCH="aarch64"
 export WIN_ARCH="arm64ec,aarch64,i386"
-export OUTPUT_DIR="$HOME/compiled-files-aarch64"
+export JOBS="${JOBS:-4}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
+export OUTPUT_DIR="${OUTPUT_DIR:-$PROJECT_ROOT/out/compiled-files-aarch64}"
 
-export deps="$HOME/termuxfs/aarch64/data/data/com.termux/files/usr"
-export RUNTIME_PATH="/data/data/com.termux/files/usr"
+export deps="${deps:-$PROJECT_ROOT/out/termuxfs/aarch64/data/data/com.termux/files/usr}"
+export RUNTIME_PATH="${RUNTIME_PATH:-/data/data/com.termux/files/usr}"
 export install_dir=$deps/../opt/wine
+export CCACHE_DIR="${CCACHE_DIR:-$PROJECT_ROOT/out/.ccache}"
+export CCACHE_TEMPDIR="${CCACHE_TEMPDIR:-$PROJECT_ROOT/out/.ccache-tmp}"
+mkdir -p "$CCACHE_DIR" "$CCACHE_TEMPDIR"
 
 #export TOOLCHAIN="$HOME/Android/android-ndk-r27d/toolchains/llvm/prebuilt/linux-x86_64/bin"
-export TOOLCHAIN="$HOME/Android/Sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin"
-export LLVM_MINGW_TOOLCHAIN="$HOME/toolchains/llvm-mingw-20250920-ucrt-ubuntu-22.04-x86_64/bin"
-export TARGET=aarch64-linux-android28
-export PATH=$LLVM_MINGW_TOOLCHAIN:$PATH
+export TOOLCHAIN="${TOOLCHAIN:-$HOME/Android/Sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin}"
+export LLVM_MINGW_TOOLCHAIN="${LLVM_MINGW_TOOLCHAIN:-$HOME/toolchains/llvm-mingw-20250920-ucrt-ubuntu-22.04-x86_64/bin}"
+export TARGET="${TARGET:-aarch64-linux-android28}"
+export PATH="$LLVM_MINGW_TOOLCHAIN:$PATH"
 
-export CC=$TOOLCHAIN/$TARGET-clang
-export AS=$CC
-export CXX=$TOOLCHAIN/$TARGET-clang++
-export AR=$TOOLCHAIN/llvm-ar
-export LD=$TOOLCHAIN/ld
-export RANLIB=$TOOLCHAIN/llvm-ranlib
-export STRIP=$TOOLCHAIN/llvm-strip
-export DLLTOOL=$LLVM_MINGW_TOOLCHAIN/llvm-dlltool
+HOST_ARG=(--host="$TARGET")
+SYSROOT="$TOOLCHAIN/../sysroot"
+if [ -x "$TOOLCHAIN/$TARGET-clang" ]; then
+  export CC="$TOOLCHAIN/$TARGET-clang"
+  export AS="$CC"
+  export CXX="$TOOLCHAIN/$TARGET-clang++"
+  export AR="$TOOLCHAIN/llvm-ar"
+  export LD="$TOOLCHAIN/ld"
+  export RANLIB="$TOOLCHAIN/llvm-ranlib"
+  export STRIP="$TOOLCHAIN/llvm-strip"
+  export DLLTOOL="$LLVM_MINGW_TOOLCHAIN/llvm-dlltool"
+else
+  echo "Info: Android NDK not found, using native Ubuntu toolchain fallback."
+  HOST_ARG=()
+  SYSROOT=""
+  export CC="${CC:-ccache clang}"
+  export AS="${AS:-clang}"
+  export CXX="${CXX:-ccache clang++}"
+  export AR="${AR:-llvm-ar}"
+  export LD="${LD:-ld.lld}"
+  export RANLIB="${RANLIB:-llvm-ranlib}"
+  export STRIP="${STRIP:-llvm-strip}"
+  export DLLTOOL="${DLLTOOL:-llvm-dlltool}"
+fi
+
+if [ ! -x "$LLVM_MINGW_TOOLCHAIN/aarch64-w64-mingw32-clang" ] || [ ! -x "$LLVM_MINGW_TOOLCHAIN/i686-w64-mingw32-clang" ]; then
+  echo "Error: llvm-mingw toolchain not found in $LLVM_MINGW_TOOLCHAIN"
+  exit 1
+fi
 
 # Force a dedicated ARM64EC cross-compiler name so Wine configure
 # does not fall back to plain "clang" with unsupported "arm64ec-windows".
-export ARM64EC_WRAPPER_DIR="$HOME/toolchains/arm64ec-wrapper/bin"
+export ARM64EC_WRAPPER_DIR="${ARM64EC_WRAPPER_DIR:-$PROJECT_ROOT/out/toolchains/arm64ec-wrapper/bin}"
 mkdir -p "$ARM64EC_WRAPPER_DIR"
 cat > "$ARM64EC_WRAPPER_DIR/arm64ec-w64-mingw32-clang" <<EOF
 #!/bin/sh
@@ -34,22 +61,91 @@ exec "$LLVM_MINGW_TOOLCHAIN/clang" --target=arm64ec-w64-mingw32 "\$@"
 EOF
 chmod +x "$ARM64EC_WRAPPER_DIR/arm64ec-w64-mingw32-clang"
 
+# Provide weak fallback aliases for arm64ec-only unresolved stubs generated from .spec files.
+ARM64EC_STUB_ALIAS_SRC="$ARM64EC_WRAPPER_DIR/arm64ec-stub-aliases.S"
+ARM64EC_STUB_ALIAS_OBJ="$ARM64EC_WRAPPER_DIR/arm64ec-stub-aliases.o"
+cat > "$ARM64EC_STUB_ALIAS_SRC" <<'EOF'
+    .text
+    .p2align 2
+    .globl __wine_arm64ec_unimplemented
+__wine_arm64ec_unimplemented:
+    mov w0, #1
+    ret
+
+    .section .drectve
+EOF
+
+{
+  echo '    .ascii " /alternatename:DllCanUnloadNow=__wine_arm64ec_unimplemented"'
+  echo '    .ascii " /alternatename:DllRegisterServer=__wine_arm64ec_unimplemented"'
+  echo '    .ascii " /alternatename:DllUnregisterServer=__wine_arm64ec_unimplemented"'
+  find "$PROJECT_ROOT/dlls" -name '*.spec' -type f | sort | while IFS= read -r spec; do
+    awk '
+      /^[[:space:]]*(@|[0-9]+)/ {
+        for (i=1; i<=NF; i++) if ($i == "stub") {
+          sym = $NF
+          gsub(/[^A-Za-z0-9_]/, "", sym)
+          if (sym != "" && sym != "stub") print sym
+          break
+        }
+      }
+    ' "$spec"
+  done | sort -u | while IFS= read -r sym; do
+        case "$sym" in
+          ''|*[!A-Za-z0-9_]*)
+            continue
+            ;;
+        esac
+        alias="__wine_stub_${sym}"
+        alias_escaped=${alias//\\/\\\\}
+        alias_escaped=${alias_escaped//\"/\\\"}
+        printf '    .ascii " /alternatename:%s=__wine_arm64ec_unimplemented"\n' "$alias_escaped"
+      done
+  find "$PROJECT_ROOT/dlls" -name '*.spec' -type f | sort | while IFS= read -r spec; do
+    mod=$(basename "$spec" .spec)
+    mod=${mod//[^A-Za-z0-9_]/_}
+    awk -v m="$mod" '
+      /^[[:space:]]*[0-9]+[[:space:]]+stub([[:space:]]|$)/ {
+        ord=$1
+        gsub(/[^0-9]/,"",ord)
+        if (ord != "") print "__wine_stub_" m "_dll_" ord
+      }
+    ' "$spec"
+  done | sort -u | while IFS= read -r alias; do
+    alias_escaped=${alias//\\/\\\\}
+    alias_escaped=${alias_escaped//\"/\\\"}
+    printf '    .ascii " /alternatename:%s=__wine_arm64ec_unimplemented"\n' "$alias_escaped"
+  done
+} >> "$ARM64EC_STUB_ALIAS_SRC"
+
+"$LLVM_MINGW_TOOLCHAIN/clang" --target=arm64ec-w64-mingw32 -c "$ARM64EC_STUB_ALIAS_SRC" -o "$ARM64EC_STUB_ALIAS_OBJ"
+
 # Some Wine link paths still invoke *-gcc and can request libgcc.a which is
 # not present in this llvm-mingw setup. Provide gcc-compatible wrappers that
 # forward to clang and drop explicit -lgcc/-lgcc_eh requests.
 make_gcc_wrapper() {
   local name="$1"
   local target="$2"
+  local extra_obj="${3:-}"
+  local force_unresolved="${4:-0}"
   cat > "$ARM64EC_WRAPPER_DIR/$name" <<EOF
 #!/usr/bin/env bash
 set -e
 args=()
+compile_only=0
 for a in "\$@"; do
   case "\$a" in
     -lgcc|-lgcc_eh) continue ;;
+    -c|-S|-E|-M|-MM|-fsyntax-only) compile_only=1; args+=("\$a") ;;
     *) args+=("\$a") ;;
   esac
 done
+if [ "\$compile_only" -eq 0 ] && [ -n "$extra_obj" ]; then
+  args+=("$extra_obj")
+fi
+if [ "\$compile_only" -eq 0 ] && [ "$force_unresolved" = "1" ]; then
+  args+=("-Wl,/force:unresolved")
+fi
 exec "$LLVM_MINGW_TOOLCHAIN/clang" --target="$target" -rtlib=compiler-rt "\${args[@]}"
 EOF
   chmod +x "$ARM64EC_WRAPPER_DIR/$name"
@@ -58,7 +154,57 @@ EOF
 make_gcc_wrapper "i686-w64-mingw32-gcc" "i686-w64-mingw32"
 make_gcc_wrapper "x86_64-w64-mingw32-gcc" "x86_64-w64-mingw32"
 make_gcc_wrapper "aarch64-w64-mingw32-gcc" "aarch64-w64-mingw32"
-make_gcc_wrapper "arm64ec-w64-mingw32-gcc" "arm64ec-w64-mingw32"
+make_gcc_wrapper "arm64ec-w64-mingw32-gcc" "arm64ec-w64-mingw32" "$ARM64EC_STUB_ALIAS_OBJ" "1"
+
+HOST_CLANG_REAL="${HOST_CLANG_REAL:-$(command -v clang || true)}"
+HOST_CLANGXX_REAL="${HOST_CLANGXX_REAL:-$(command -v clang++ || true)}"
+
+if [ -n "$HOST_CLANG_REAL" ]; then
+  cat > "$ARM64EC_WRAPPER_DIR/clang" <<EOF
+#!/usr/bin/env bash
+set -e
+target_arg=""
+for a in "\$@"; do
+  case "\$a" in
+    --target=*) target_arg="\${a#--target=}" ;;
+  esac
+done
+if [ -z "\$target_arg" ]; then
+  args=()
+  for a in "\$@"; do
+    [ "\$a" = "-mabi=ms" ] && continue
+    args+=("\$a")
+  done
+  exec "$HOST_CLANG_REAL" "\${args[@]}"
+fi
+exec "$HOST_CLANG_REAL" "\$@"
+EOF
+  chmod +x "$ARM64EC_WRAPPER_DIR/clang"
+fi
+
+if [ -n "$HOST_CLANGXX_REAL" ]; then
+  cat > "$ARM64EC_WRAPPER_DIR/clang++" <<EOF
+#!/usr/bin/env bash
+set -e
+target_arg=""
+for a in "\$@"; do
+  case "\$a" in
+    --target=*) target_arg="\${a#--target=}" ;;
+  esac
+done
+if [ -z "\$target_arg" ]; then
+  args=()
+  for a in "\$@"; do
+    [ "\$a" = "-mabi=ms" ] && continue
+    args+=("\$a")
+  done
+  exec "$HOST_CLANGXX_REAL" "\${args[@]}"
+fi
+exec "$HOST_CLANGXX_REAL" "\$@"
+EOF
+  chmod +x "$ARM64EC_WRAPPER_DIR/clang++"
+fi
+
 export PATH="$ARM64EC_WRAPPER_DIR:$PATH"
 export arm64ec_CC="$ARM64EC_WRAPPER_DIR/arm64ec-w64-mingw32-clang"
 export aarch64_CC="$LLVM_MINGW_TOOLCHAIN/aarch64-w64-mingw32-clang"
@@ -67,7 +213,11 @@ export x86_64_CC="$LLVM_MINGW_TOOLCHAIN/x86_64-w64-mingw32-clang"
 
 export PKG_CONFIG_LIBDIR=$deps/lib/pkgconfig:$deps/share/pkgconfig
 export ACLOCAL_PATH=$deps/lib/aclocal:$deps/share/aclocal
-export CPPFLAGS="-I$deps/include --sysroot=$TOOLCHAIN/../sysroot"
+if [ -n "$SYSROOT" ]; then
+  export CPPFLAGS="-I$deps/include --sysroot=$SYSROOT"
+else
+  export CPPFLAGS="-I$deps/include"
+fi
 
 export C_OPTS="-Wno-declaration-after-statement -Wno-implicit-function-declaration -Wno-int-conversion"
 export CFLAGS=$C_OPTS
@@ -85,6 +235,15 @@ export GSTREAMER_CFLAGS="-I$deps/include/gstreamer-1.0 -I$deps/include/glib-2.0 
 export GSTREAMER_LIBS="-L$deps/lib -lgstgl-1.0 -lgstapp-1.0 -lgstvideo-1.0 -lgstaudio-1.0 -lglib-2.0 -lgobject-2.0 -lgio-2.0 -lgsttag-1.0 -lgstbase-1.0 -lgstreamer-1.0"
 export FFMPEG_CFLAGS="-I$deps/include/libavutil -I$deps/include/libavcodec -I$deps/include/libavformat"
 export FFMPEG_LIBS="-L$deps/lib -lavutil -lavcodec -lavformat"
+
+if [ -z "$SYSROOT" ]; then
+  # In VM fallback mode rely on system pkg-config paths instead of termux-style deps.
+  export CPPFLAGS=""
+  export LDFLAGS=""
+  unset PKG_CONFIG_LIBDIR ACLOCAL_PATH
+  unset FREETYPE_CFLAGS PULSE_CFLAGS PULSE_LIBS SDL2_CFLAGS SDL2_LIBS
+  unset X_CFLAGS X_LIBS GSTREAMER_CFLAGS GSTREAMER_LIBS FFMPEG_CFLAGS FFMPEG_LIBS
+fi
 
 for arg in "$@"
 do
@@ -120,14 +279,19 @@ do
       fi
     done
 
+    WINE_TOOLS_ARG=()
+    if [ -d "./wine-tools" ]; then
+      WINE_TOOLS_ARG=(--with-wine-tools=./wine-tools)
+    fi
+
     ./configure \
       --enable-archs=$WIN_ARCH \
-      --host=$TARGET \
+      "${HOST_ARG[@]}" \
       --prefix $install_dir \
       --bindir $install_dir/bin \
       --libdir $install_dir/lib \
       --exec-prefix $install_dir \
-      --with-wine-tools=./wine-tools \
+      "${WINE_TOOLS_ARG[@]}" \
       --enable-win64 \
       --enable-nls \
       --disable-amd_ags_x64 \
@@ -153,7 +317,7 @@ do
       --without-krb5 \
       --without-netapi \
       --without-opencl \
-      --with-opengl \
+      --without-opengl \
       --without-osmesa \
       --without-oss \
       --without-pcap \
@@ -168,7 +332,7 @@ do
       --without-usb \
       --without-v4l2 \
       --without-vosk \
-      --with-vulkan \
+      --without-vulkan \
       --without-wayland \
       --without-xcomposite \
       --without-xcursor \
@@ -179,7 +343,7 @@ do
       --without-xrandr \
       --without-xrender \
       --without-xshape \
-      --with-xshm \
+      --without-xshm \
       --without-xxf86vm
 
     echo "Applying patches..."
@@ -283,11 +447,16 @@ do
   if [ "$arg" == "--build" ]
   then
     echo "Building..."
+    # arm64ec link stage in this tree can fail on stub/native exports with EC symbols.
+    # Strip prefer-native for the generated Makefile in this build to keep stubs linkable.
+    if [ -f Makefile ]; then
+      sed -i 's/[[:space:]]-Wb,--prefer-native//g' Makefile
+    fi
     rm -rf $OUTPUT_DIR/bin
     rm -rf $OUTPUT_DIR/lib
     rm -rf $OUTPUT_DIR/share
     rm -rf $install_dir
-    make -j$(nproc)
+    make -j"$JOBS"
   fi
 
   if [ "$arg" == "--install" ]
@@ -299,12 +468,12 @@ do
     mkdir -p $install_dir
 
     if make -n install >/dev/null 2>&1; then
-      make install -j$(nproc)
+      make install -j"$JOBS"
     elif make -n install-lib >/dev/null 2>&1; then
       echo "Target 'install' not found, using 'install-lib'"
-      make install-lib -j$(nproc)
+      make install-lib -j"$JOBS"
       if make -n install-dev >/dev/null 2>&1; then
-        make install-dev -j$(nproc)
+        make install-dev -j"$JOBS"
       fi
     else
       echo "Error: no install target found in Makefile"
