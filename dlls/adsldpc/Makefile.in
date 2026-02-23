@@ -1,3 +1,4 @@
 MODULE    = adsldpc.dll
 
-EXTRADLLFLAGS = -Wb,--prefer-native
+SOURCES = \
+	arm64ec_stubs.c

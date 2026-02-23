@@ -1,31 +1,61 @@
 #!/bin/bash
+set -euo pipefail
 
 export ARCH="x86_64"
 export WIN_ARCH="x86_64,i386"
-export OUTPUT_DIR="$HOME/compiled-files-x86_64"
+export JOBS="${JOBS:-4}"
+SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
+PROJECT_ROOT="$(dirname "$SCRIPT_DIR")"
 
-export deps="$HOME/termuxfs/x86_64/data/data/com.termux/files/usr"
-export RUNTIME_PATH="/data/data/com.termux/files/usr"
+export OUTPUT_DIR="${OUTPUT_DIR:-$PROJECT_ROOT/out/compiled-files-x86_64}"
+export deps="${deps:-$PROJECT_ROOT/out/termuxfs/x86_64/data/data/com.termux/files/usr}"
+export RUNTIME_PATH="${RUNTIME_PATH:-/data/data/com.termux/files/usr}"
 export install_dir=$deps/../opt/wine
+export CCACHE_DIR="${CCACHE_DIR:-$PROJECT_ROOT/out/.ccache}"
+export CCACHE_TEMPDIR="${CCACHE_TEMPDIR:-$PROJECT_ROOT/out/.ccache-tmp}"
+mkdir -p "$CCACHE_DIR" "$CCACHE_TEMPDIR"
 
 #export TOOLCHAIN="$HOME/Android/android-ndk-r27d/toolchains/llvm/prebuilt/linux-x86_64/bin"
-export TOOLCHAIN="$HOME/Android/Sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin"
-export LLVM_MINGW_TOOLCHAIN="$HOME/toolchains/llvm-mingw-20250920-ucrt-ubuntu-22.04-x86_64/bin"
-export TARGET=x86_64-linux-android28
-export PATH=$LLVM_MINGW_TOOLCHAIN:$PATH
+export TOOLCHAIN="${TOOLCHAIN:-$HOME/Android/Sdk/ndk/27.3.13750724/toolchains/llvm/prebuilt/linux-x86_64/bin}"
+export LLVM_MINGW_TOOLCHAIN="${LLVM_MINGW_TOOLCHAIN:-$HOME/toolchains/llvm-mingw-20250920-ucrt-ubuntu-22.04-x86_64/bin}"
+export TARGET="${TARGET:-x86_64-linux-android28}"
+export PATH="$LLVM_MINGW_TOOLCHAIN:$PATH"
 
-export CC=$TOOLCHAIN/$TARGET-clang
-export AS=$CC
-export CXX=$TOOLCHAIN/$TARGET-clang++
-export AR=$TOOLCHAIN/llvm-ar
-export LD=$TOOLCHAIN/ld
-export RANLIB=$TOOLCHAIN/llvm-ranlib
-export STRIP=$TOOLCHAIN/llvm-strip
-export DLLTOOL=$LLVM_MINGW_TOOLCHAIN/llvm-dlltool
+HOST_ARG=(--host="$TARGET")
+MINGW_ARG=(--with-mingw=clang)
+SYSROOT="$TOOLCHAIN/../sysroot"
+
+if [ -x "$TOOLCHAIN/$TARGET-clang" ]; then
+  export CC="$TOOLCHAIN/$TARGET-clang"
+  export AS="$CC"
+  export CXX="$TOOLCHAIN/$TARGET-clang++"
+  export AR="$TOOLCHAIN/llvm-ar"
+  export LD="$TOOLCHAIN/ld"
+  export RANLIB="$TOOLCHAIN/llvm-ranlib"
+  export STRIP="$TOOLCHAIN/llvm-strip"
+  export DLLTOOL="$LLVM_MINGW_TOOLCHAIN/llvm-dlltool"
+else
+  echo "Info: Android NDK not found, using native Ubuntu toolchain fallback."
+  HOST_ARG=()
+  MINGW_ARG=()
+  SYSROOT=""
+  export CC="${CC:-ccache clang}"
+  export AS="${AS:-clang}"
+  export CXX="${CXX:-ccache clang++}"
+  export AR="${AR:-llvm-ar}"
+  export LD="${LD:-ld.lld}"
+  export RANLIB="${RANLIB:-llvm-ranlib}"
+  export STRIP="${STRIP:-llvm-strip}"
+  export DLLTOOL="${DLLTOOL:-x86_64-w64-mingw32-dlltool}"
+fi
 
 export PKG_CONFIG_LIBDIR=$deps/lib/pkgconfig:$deps/share/pkgconfig
 export ACLOCAL_PATH=$deps/lib/aclocal:$deps/share/aclocal
-export CPPFLAGS="-I$deps/include --sysroot=$TOOLCHAIN/../sysroot"
+if [ -n "$SYSROOT" ]; then
+  export CPPFLAGS="-I$deps/include --sysroot=$SYSROOT"
+else
+  export CPPFLAGS="-I$deps/include"
+fi
 
 export C_OPTS="-march=x86-64 -mtune=generic -Wno-declaration-after-statement -Wno-implicit-function-declaration -Wno-int-conversion"
 export CFLAGS=$C_OPTS
@@ -73,12 +103,12 @@ do
   then
     ./configure \
       --enable-archs=$WIN_ARCH \
-      --host=$TARGET \
+      "${HOST_ARG[@]}" \
       --prefix $install_dir \
       --bindir $install_dir/bin \
       --libdir $install_dir/lib \
       --exec-prefix $install_dir \
-      --with-mingw=clang \
+      "${MINGW_ARG[@]}" \
       --with-wine-tools=./wine-tools \
       --enable-win64 \
       --disable-win16 \
@@ -205,7 +235,7 @@ do
     rm -rf $OUTPUT_DIR/lib
     rm -rf $OUTPUT_DIR/share
     rm -rf $install_dir
-    make -j$(nproc)
+    make -j"$JOBS"
   fi
 
   if [ "$arg" == "--install" ]
@@ -215,7 +245,7 @@ do
     mkdir -p $OUTPUT_DIR/lib
     mkdir -p $OUTPUT_DIR/share
     mkdir -p $install_dir
-    make install -j$(nproc)
+    make install -j"$JOBS"
     cp -r $install_dir/bin/wine* $OUTPUT_DIR/bin
     cp -r $install_dir/bin/reg* $OUTPUT_DIR/bin
     cp -r $install_dir/bin/msi* $OUTPUT_DIR/bin

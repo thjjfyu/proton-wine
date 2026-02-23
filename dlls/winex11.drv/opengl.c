@@ -540,6 +540,9 @@ static void *opengl_handle;
 static void init_opengl(void)
 {
     int error_base, event_base;
+#ifdef __ANDROID__
+    int wine_x11forceglx = 0;
+#endif
     unsigned int i;
 
     /* No need to load any other libraries as according to the ABI, libGL should be self-sufficient
@@ -629,7 +632,14 @@ static void init_opengl(void)
 
     if(!X11DRV_WineGL_InitOpenglInfo()) goto failed;
 
+#ifdef __ANDROID__
+    if (getenv("WINE_X11FORCEGLX"))
+        wine_x11forceglx = atoi("WINE_X11FORCEGLX");
+
+    if (XQueryExtension( gdi_display, "GLX", &glx_opcode, &event_base, &error_base ) || wine_x11forceglx)
+#else
     if (XQueryExtension( gdi_display, "GLX", &glx_opcode, &event_base, &error_base ))
+#endif
     {
         TRACE("GLX is up and running error_base = %d\n", error_base);
     } else {
